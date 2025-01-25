@@ -1,250 +1,267 @@
 var APP = {
 
-	Player: function () {
+    Player: function () {
 
-		var renderer = new THREE.WebGLRenderer( { antialias: true } );
-		renderer.setPixelRatio( window.devicePixelRatio ); // TODO: Use player.setPixelRatio()
+        var renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
 
-		var loader = new THREE.ObjectLoader();
-		var camera, scene;
+        var loader = new THREE.ObjectLoader();
+        var camera, scene;
 
-		var events = {};
+        var events = {};
 
-		var dom = document.createElement( 'div' );
-		dom.appendChild( renderer.domElement );
+        var dom = document.createElement('div');
+        dom.appendChild(renderer.domElement);
 
-		this.dom = dom;
-		this.canvas = renderer.domElement;
+        this.dom = dom;
+        this.canvas = renderer.domElement;
 
-		this.width = 500;
-		this.height = 500;
+        this.width = 500;
+        this.height = 500;
 
-		this.load = function ( json ) {
+        // Создаем EffectComposer
+        var composer = new EffectComposer(renderer);
 
-			var project = json.project;
+        this.load = function (json) {
 
-			if ( project.shadows !== undefined ) renderer.shadowMap.enabled = project.shadows;
-			if ( project.shadowType !== undefined ) renderer.shadowMap.type = project.shadowType;
-			if ( project.toneMapping !== undefined ) renderer.toneMapping = project.toneMapping;
-			if ( project.toneMappingExposure !== undefined ) renderer.toneMappingExposure = project.toneMappingExposure;
+            var project = json.project;
 
-			this.setScene( loader.parse( json.scene ) );
-			this.setCamera( loader.parse( json.camera ) );
+            if (project.shadows !== undefined) renderer.shadowMap.enabled = project.shadows;
+            if (project.shadowType !== undefined) renderer.shadowMap.type = project.shadowType;
+            if (project.toneMapping !== undefined) renderer.toneMapping = project.toneMapping;
+            if (project.toneMappingExposure !== undefined) renderer.toneMappingExposure = project.toneMappingExposure;
 
-			events = {
-				init: [],
-				start: [],
-				stop: [],
-				keydown: [],
-				keyup: [],
-				pointerdown: [],
-				pointerup: [],
-				pointermove: [],
-				update: []
-			};
+            this.setScene(loader.parse(json.scene));
+            this.setCamera(loader.parse(json.camera));
 
-			var scriptWrapParams = 'player,renderer,scene,camera';
-			var scriptWrapResultObj = {};
+            // Добавляем RenderPass
+            var renderPass = new RenderPass(scene, camera);
+            composer.addPass(renderPass);
 
-			for ( var eventKey in events ) {
+            // Добавляем FXAA (антиалиасинг)
+            var fxaaPass = new ShaderPass(FXAAShader);
+            fxaaPass.material.uniforms['resolution'].value.set(1 / this.width, 1 / this.height);
+            composer.addPass(fxaaPass);
 
-				scriptWrapParams += ',' + eventKey;
-				scriptWrapResultObj[ eventKey ] = eventKey;
+            // Добавьте другие пассы по необходимости
 
-			}
+            events = {
+                init: [],
+                start: [],
+                stop: [],
+                keydown: [],
+                keyup: [],
+                pointerdown: [],
+                pointerup: [],
+                pointermove: [],
+                update: []
+            };
 
-			var scriptWrapResult = JSON.stringify( scriptWrapResultObj ).replace( /\"/g, '' );
+            var scriptWrapParams = 'player,renderer,scene,camera';
+            var scriptWrapResultObj = {};
 
-			for ( var uuid in json.scripts ) {
+            for (var eventKey in events) {
 
-				var object = scene.getObjectByProperty( 'uuid', uuid, true );
+                scriptWrapParams += ',' + eventKey;
+                scriptWrapResultObj[eventKey] = eventKey;
 
-				if ( object === undefined ) {
+            }
 
-					console.warn( 'APP.Player: Script without object.', uuid );
-					continue;
+            var scriptWrapResult = JSON.stringify(scriptWrapResultObj).replace(/\"/g, '');
 
-				}
+            for (var uuid in json.scripts) {
 
-				var scripts = json.scripts[ uuid ];
+                var object = scene.getObjectByProperty('uuid', uuid, true);
 
-				for ( var i = 0; i < scripts.length; i ++ ) {
+                if (object === undefined) {
 
-					var script = scripts[ i ];
+                    console.warn('APP.Player: Script without object.', uuid);
+                    continue;
 
-					var functions = ( new Function( scriptWrapParams, script.source + '\nreturn ' + scriptWrapResult + ';' ).bind( object ) )( this, renderer, scene, camera );
+                }
 
-					for ( var name in functions ) {
+                var scripts = json.scripts[uuid];
 
-						if ( functions[ name ] === undefined ) continue;
+                for (var i = 0; i < scripts.length; i++) {
 
-						if ( events[ name ] === undefined ) {
+                    var script = scripts[i];
 
-							console.warn( 'APP.Player: Event type not supported (', name, ')' );
-							continue;
+                    var functions = (new Function(scriptWrapParams, script.source + '\nreturn ' + scriptWrapResult + ';').bind(object))(this, renderer, scene, camera);
 
-						}
+                    for (var name in functions) {
 
-						events[ name ].push( functions[ name ].bind( object ) );
+                        if (functions[name] === undefined) continue;
 
-					}
+                        if (events[name] === undefined) {
 
-				}
+                            console.warn('APP.Player: Event type not supported (', name, ')');
+                            continue;
 
-			}
+                        }
 
-			dispatch( events.init, arguments );
+                        events[name].push(functions[name].bind(object));
 
-		};
+                    }
 
-		this.setCamera = function ( value ) {
+                }
 
-			camera = value;
-			camera.aspect = this.width / this.height;
-			camera.updateProjectionMatrix();
+            }
 
-		};
+            dispatch(events.init, arguments);
 
-		this.setScene = function ( value ) {
+        };
 
-			scene = value;
+        this.setCamera = function (value) {
 
-		};
+            camera = value;
+            camera.aspect = this.width / this.height;
+            camera.updateProjectionMatrix();
 
-		this.setPixelRatio = function ( pixelRatio ) {
+        };
 
-			renderer.setPixelRatio( pixelRatio );
+        this.setScene = function (value) {
 
-		};
+            scene = value;
 
-		this.setSize = function ( width, height ) {
+        };
 
-			this.width = width;
-			this.height = height;
+        this.setPixelRatio = function (pixelRatio) {
 
-			if ( camera ) {
+            renderer.setPixelRatio(pixelRatio);
 
-				camera.aspect = this.width / this.height;
-				camera.updateProjectionMatrix();
+        };
 
-			}
+        this.setSize = function (width, height) {
 
-			renderer.setSize( width, height );
+            this.width = width;
+            this.height = height;
 
-		};
+            if (camera) {
 
-		function dispatch( array, event ) {
+                camera.aspect = this.width / this.height;
+                camera.updateProjectionMatrix();
 
-			for ( var i = 0, l = array.length; i < l; i ++ ) {
+            }
 
-				array[ i ]( event );
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
 
-			}
+        };
 
-		}
+        function dispatch(array, event) {
 
-		var time, startTime, prevTime;
+            for (var i = 0, l = array.length; i < l; i++) {
 
-		function animate() {
+                array[i](event);
 
-			time = performance.now();
+            }
 
-			try {
+        }
 
-				dispatch( events.update, { time: time - startTime, delta: time - prevTime } );
+        var time, startTime, prevTime;
 
-			} catch ( e ) {
+        function animate() {
 
-				console.error( ( e.message || e ), ( e.stack || '' ) );
+            time = performance.now();
 
-			}
+            try {
 
-			renderer.render( scene, camera );
+                dispatch(events.update, { time: time - startTime, delta: time - prevTime });
 
-			prevTime = time;
+            } catch (e) {
 
-		}
+                console.error((e.message || e), (e.stack || ''));
 
-		this.play = function () {
+            }
 
-			startTime = prevTime = performance.now();
+            // Используем composer вместо renderer
+            composer.render();
 
-			document.addEventListener( 'keydown', onKeyDown );
-			document.addEventListener( 'keyup', onKeyUp );
-			document.addEventListener( 'pointerdown', onPointerDown );
-			document.addEventListener( 'pointerup', onPointerUp );
-			document.addEventListener( 'pointermove', onPointerMove );
+            prevTime = time;
 
-			dispatch( events.start, arguments );
+        }
 
-			renderer.setAnimationLoop( animate );
+        this.play = function () {
 
-		};
+            startTime = prevTime = performance.now();
 
-		this.stop = function () {
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('pointerdown', onPointerDown);
+            document.addEventListener('pointerup', onPointerUp);
+            document.addEventListener('pointermove', onPointerMove);
 
-			document.removeEventListener( 'keydown', onKeyDown );
-			document.removeEventListener( 'keyup', onKeyUp );
-			document.removeEventListener( 'pointerdown', onPointerDown );
-			document.removeEventListener( 'pointerup', onPointerUp );
-			document.removeEventListener( 'pointermove', onPointerMove );
+            dispatch(events.start, arguments);
 
-			dispatch( events.stop, arguments );
+            renderer.setAnimationLoop(animate);
 
-			renderer.setAnimationLoop( null );
+        };
 
-		};
+        this.stop = function () {
 
-		this.render = function ( time ) {
+            document.removeEventListener('keydown', onKeyDown);
+            document.removeEventListener('keyup', onKeyUp);
+            document.removeEventListener('pointerdown', onPointerDown);
+            document.removeEventListener('pointerup', onPointerUp);
+            document.removeEventListener('pointermove', onPointerMove);
 
-			dispatch( events.update, { time: time * 1000, delta: 0 /* TODO */ } );
+            dispatch(events.stop, arguments);
 
-			renderer.render( scene, camera );
+            renderer.setAnimationLoop(null);
 
-		};
+        };
 
-		this.dispose = function () {
+        this.render = function (time) {
 
-			renderer.dispose();
+            dispatch(events.update, { time: time * 1000, delta: 0 /* TODO */ });
 
-			camera = undefined;
-			scene = undefined;
+            // Используем composer вместо renderer
+            composer.render();
 
-		};
+        };
 
-		//
+        this.dispose = function () {
 
-		function onKeyDown( event ) {
+            renderer.dispose();
 
-			dispatch( events.keydown, event );
+            camera = undefined;
+            scene = undefined;
 
-		}
+        };
 
-		function onKeyUp( event ) {
+        //
 
-			dispatch( events.keyup, event );
+        function onKeyDown(event) {
 
-		}
+            dispatch(events.keydown, event);
 
-		function onPointerDown( event ) {
+        }
 
-			dispatch( events.pointerdown, event );
+        function onKeyUp(event) {
 
-		}
+            dispatch(events.keyup, event);
 
-		function onPointerUp( event ) {
+        }
 
-			dispatch( events.pointerup, event );
+        function onPointerDown(event) {
 
-		}
+            dispatch(events.pointerdown, event);
 
-		function onPointerMove( event ) {
+        }
 
-			dispatch( events.pointermove, event );
+        function onPointerUp(event) {
 
-		}
+            dispatch(events.pointerup, event);
 
-	}
+        }
+
+        function onPointerMove(event) {
+
+            dispatch(events.pointermove, event);
+
+        }
+
+    }
 
 };
 

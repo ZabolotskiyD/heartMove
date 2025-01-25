@@ -1,57 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<title>heartMove</title>
-		<meta charset="utf-8">
-		<meta name="generator" content="Three.js Editor">
-		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-		<style>
-			body {
-				font-family: sans-serif;
-				font-size: 11px;
-				background-color: #000;
-				margin: 0px;
-			}
-			canvas {
-				display: block;
-			}
-		</style>
-	</head>
-	<body ontouchstart="">
-		<script type="importmap">
+
+<head>
+	<title>heartMove</title>
+	<meta charset="utf-8">
+	<meta name="generator" content="Three.js Editor">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<style>
+		body {
+			font-family: sans-serif;
+			font-size: 11px;
+			background-color: #000;
+			margin: 0px;
+		}
+
+		canvas {
+			display: block;
+		}
+	</style>
+</head>
+
+<body ontouchstart="">
+	<script type="importmap">
 			{
-				"imports": {
-					"three": "./js/three.module.js"
-				}
+			  "imports": {
+				"three": "https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js"
+			  }
 			}
-		</script>
-		<script type="module">
+		  </script>
+	<script type="module">
 
-			import * as THREE from 'three';
-			import { APP } from './js/app.js';
+		import * as THREE from 'three';
+		import { APP } from 'https://rawcdn.githack.com/ZabolotskiyD/heartMove/ee780419e00a7776957d5942263c95a4418fb98d/js/app.js';
+		import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+		import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+		import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+		import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
+		// Добавьте другие необходимые пассы, например, для размытия, цветокоррекции и т.д.
 
-			window.THREE = THREE; // Used by APP Scripts.
+		window.THREE = THREE; // Used by APP Scripts.
 
-			var loader = new THREE.FileLoader();
-			loader.load( 'app.json', function ( text ) {
+		var loader = new THREE.FileLoader();
+		loader.load('https://rawcdn.githack.com/ZabolotskiyD/heartMove/ee780419e00a7776957d5942263c95a4418fb98d/app.json', function (text) {
 
-				var player = new APP.Player();
-				player.load( JSON.parse( text ) );
-				player.setSize( window.innerWidth, window.innerHeight );
-				player.play();
+			var player = new APP.Player();
+			player.load(JSON.parse(text));
+			player.setSize(window.innerWidth, window.innerHeight);
+			player.play();
 
-				document.body.appendChild( player.dom );
+			document.body.appendChild(player.dom);
 
-				window.addEventListener( 'resize', function () {
+			window.addEventListener('resize', function () {
 
-					player.setSize( window.innerWidth, window.innerHeight );
+				player.setSize(window.innerWidth, window.innerHeight);
 
-				} );
+			});
 
-			} );
+		});
 
 
 
-		</script>
-	</body>
+	</script>
+</body>
+
 </html>
